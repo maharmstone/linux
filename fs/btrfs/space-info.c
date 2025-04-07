@@ -320,8 +320,13 @@ void btrfs_add_bg_to_space_info(struct btrfs_fs_info *info,
 	found = btrfs_find_space_info(info, block_group->flags);
 	ASSERT(found);
 	spin_lock(&found->lock);
-	found->total_bytes += block_group->length;
-	found->disk_total += block_group->length * factor;
+
+	if (!(block_group->flags & BTRFS_BLOCK_GROUP_REMAPPED) ||
+	    block_group->identity_remap_count != 0) {
+		found->total_bytes += block_group->length;
+		found->disk_total += block_group->length * factor;
+	}
+
 	found->bytes_used += block_group->used;
 	found->disk_used += block_group->used * factor;
 	found->bytes_readonly += block_group->bytes_super;
