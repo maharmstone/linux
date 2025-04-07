@@ -2264,18 +2264,14 @@ static int btrfs_read_roots(struct btrfs_fs_info *fs_info)
 		goto out;
 
 	if (btrfs_fs_incompat(fs_info, REMAP_TREE)) {
-		location.objectid = BTRFS_REMAP_TREE_OBJECTID;
-		root = btrfs_read_tree_root(tree_root, &location);
-		if (IS_ERR(root)) {
-			if (!btrfs_test_opt(fs_info, IGNOREBADROOTS)) {
-				ret = PTR_ERR(root);
-				if (ret != -ENOENT)
-					goto out;
-			}
-		} else {
-			set_bit(BTRFS_ROOT_TRACK_DIRTY, &root->state);
-			fs_info->remap_root = root;
-		}
+		/* remap_root already loaded in load_important_roots() */
+		root = fs_info->remap_root;
+
+		set_bit(BTRFS_ROOT_TRACK_DIRTY, &root->state);
+
+		root->root_key.objectid = BTRFS_REMAP_TREE_OBJECTID;
+		root->root_key.type = BTRFS_ROOT_ITEM_KEY;
+		root->root_key.offset = 0;
 	} else {
 		/*
 		* This tree can share blocks with some other fs tree during
@@ -2725,6 +2721,18 @@ static int load_important_roots(struct btrfs_fs_info *fs_info)
 		btrfs_warn(fs_info, "couldn't read tree root");
 		return ret;
 	}
+
+	if (btrfs_fs_incompat(fs_info, REMAP_TREE)) {
+		bytenr = btrfs_super_remap_root(sb);
+		gen = btrfs_super_remap_root_generation(sb);
+		level = btrfs_super_remap_root_level(sb);
+		ret = load_super_root(fs_info->remap_root, bytenr, gen, level);
+		if (ret) {
+			btrfs_warn(fs_info, "couldn't read remap root");
+			return ret;
+		}
+	}
+
 	return 0;
 }
 
@@ -3321,6 +3329,7 @@ int __cold open_ctree(struct super_block *sb, struct btrfs_fs_devices *fs_device
 	struct btrfs_fs_info *fs_info = btrfs_sb(sb);
 	struct btrfs_root *tree_root;
 	struct btrfs_root *chunk_root;
+	struct btrfs_root *remap_root;
 	int ret;
 	int level;
 
@@ -3353,6 +3362,16 @@ int __cold open_ctree(struct super_block *sb, struct btrfs_fs_devices *fs_device
 	if (IS_ERR(disk_super)) {
 		ret = PTR_ERR(disk_super);
 		goto fail_alloc;
+	}
+
+	if (btrfs_super_incompat_flags(disk_super) & BTRFS_FEATURE_INCOMPAT_REMAP_TREE) {
+		remap_root = btrfs_alloc_root(fs_info, BTRFS_REMAP_TREE_OBJECTID,
+					      GFP_KERNEL);
+		fs_info->remap_root = remap_root;
+		if (!remap_root) {
+			ret = -ENOMEM;
+			goto fail_alloc;
+		}
 	}
 
 	btrfs_info(fs_info, "first mount of filesystem %pU", disk_super->fsid);
