@@ -5437,7 +5437,8 @@ int btrfs_relocate_block_group(struct btrfs_fs_info *fs_info, u64 group_start,
 	}
 
 	*using_remap_tree = btrfs_fs_incompat(fs_info, REMAP_TREE) &&
-		!(bg->flags & BTRFS_BLOCK_GROUP_SYSTEM);
+		!(bg->flags & BTRFS_BLOCK_GROUP_SYSTEM) &&
+		!(bg->flags & BTRFS_BLOCK_GROUP_REMAP);
 
 	if (!btrfs_fs_incompat(fs_info, REMAP_TREE)) {
 		rc->data_inode = create_reloc_inode(rc->block_group);

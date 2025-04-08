@@ -1943,6 +1943,8 @@ static const char *alloc_name(u64 flags)
 		return "data";
 	case BTRFS_BLOCK_GROUP_SYSTEM:
 		return "system";
+	case BTRFS_BLOCK_GROUP_REMAP:
+		return "remap";
 	default:
 		WARN_ON(1);
 		return "invalid-combination";
